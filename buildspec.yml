@@ -2,4 +2,4 @@ version: 0.2
 phases:
   build:
     commands:
-      - docker run --rm -v $(pwd)/sql:/flyway/sql -v $(pwd)/conf:/flyway/conf flyway/flyway -ignoreMigrationPatterns=repeatable:missing -url=$url -user=$username -password=$password migrate  
+      - docker run --rm -v $(pwd)/sql:/flyway/sql -v $(pwd)/conf:/flyway/conf flyway/flyway -url=$url -user=$username -password=$password migrate  
