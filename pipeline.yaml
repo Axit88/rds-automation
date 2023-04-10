@@ -16,7 +16,7 @@ Parameters:
     Default: main
   OAuthToken:
     Type: String
-    Default: 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
+    Default: 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
   BucketName:
     Type: String
     Default: axitsamplepipelinebucket
