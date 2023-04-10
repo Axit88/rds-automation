@@ -7,7 +7,7 @@ Parameters:
     Default: default-pipeline
   ConfigurationOwner:
     Type: String
-    Default: axitdhola
+    Default: Axit88
   Repo:
     Type: String
     Default: rds-automation
@@ -16,7 +16,7 @@ Parameters:
     Default: main
   OAuthToken:
     Type: String
-    Default: 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
+    Default: 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
   BucketName:
     Type: String
     Default: axitsamplepipelinebucket
@@ -26,9 +26,6 @@ Parameters:
   CodePipelineRoleName: 
     Type: String
     Default: RDS-nested-codepipeline-role
-  CodePipelinePolicyName: 
-    Type: String
-    Default: RDS-nested-codepipeline-policy
   CodePipelineRoleForDeploy:
     Type: String
     Default: RDS-nested-codepipeline-deploy-role
@@ -65,8 +62,13 @@ Parameters:
     Type: String
   CodeBuildSecurityGroupId: 
     Type: String
+  JDBCUrl: 
+    Type: String
+    Default: jdbc:mysql://database-2.clgbfp6capnz.ap-northeast-1.rds.amazonaws.com:3306/rdsDb2
+  
 
 Resources:
+
   IAMRoleForCodePipeline:
     Type: "AWS::IAM::Role"
     Properties:
@@ -81,129 +83,132 @@ Resources:
                 - "codepipeline.amazonaws.com"
             Action:
               - "sts:AssumeRole"
-      Tags:
-        - Key: env 
-          Value: integration 
-        - Key: application 
-          Value: codepipeline 
-  
-  IAMRoleForDeployCodepipeline:
-    Type: "AWS::IAM::Role"
-    Properties:
-      Path: "/"
-      RoleName: !Ref CodePipelineRoleForDeploy
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: "Allow"
-            Principal:
-              Service:
-                - "cloudformation.amazonaws.com"
-            Action:
-              - "sts:AssumeRole"
       Policies:
-      - PolicyName: codeDeployPolicyForRDSPipeline
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-          - Action:
-            - organizations:*
-            - sso:*
-            - sns:*
-            - sso-directory:*
-            Resource: "*"
-            Effect: Allow
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        - PolicyName: lambdaCodepipelinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Action:
+              - iam:PassRole
+              Resource: "*"
+              Effect: Allow
+              Condition:
+                StringEqualsIfExists:
+                  iam:PassedToService:
+                  - cloudformation.amazonaws.com
+                  - elasticbeanstalk.amazonaws.com
+                  - ec2.amazonaws.com
+                  - ecs-tasks.amazonaws.com
+            - Action:
+              - codecommit:CancelUploadArchive
+              - codecommit:GetBranch
+              - codecommit:GetCommit
+              - codecommit:GetRepository
+              - codecommit:GetUploadArchiveStatus
+              - codecommit:UploadArchive
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - codedeploy:CreateDeployment
+              - codedeploy:GetApplication
+              - codedeploy:GetApplicationRevision
+              - codedeploy:GetDeployment
+              - codedeploy:GetDeploymentConfig
+              - codedeploy:RegisterApplicationRevision
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - codestar-connections:UseConnection
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - elasticbeanstalk:*
+              - ec2:*
+              - elasticloadbalancing:*
+              - autoscaling:*
+              - cloudwatch:*
+              - s3:*
+              - sns:*
+              - cloudformation:*
+              - rds:*
+              - sqs:*
+              - ecs:*
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - lambda:InvokeFunction
+              - lambda:ListFunctions
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - opsworks:CreateDeployment
+              - opsworks:DescribeApps
+              - opsworks:DescribeCommands
+              - opsworks:DescribeDeployments
+              - opsworks:DescribeInstances
+              - opsworks:DescribeStacks
+              - opsworks:UpdateApp
+              - opsworks:UpdateStack
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - cloudformation:CreateStack
+              - cloudformation:DeleteStack
+              - cloudformation:DescribeStacks
+              - cloudformation:UpdateStack
+              - cloudformation:CreateChangeSet
+              - cloudformation:DeleteChangeSet
+              - cloudformation:DescribeChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:SetStackPolicy
+              - cloudformation:ValidateTemplate
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - codebuild:BatchGetBuilds
+              - codebuild:StartBuild
+              - codebuild:BatchGetBuildBatches
+              - codebuild:StartBuildBatch
+              Resource: "*"
+              Effect: Allow
+            - Effect: Allow
+              Action:
+              - devicefarm:ListProjects
+              - devicefarm:ListDevicePools
+              - devicefarm:GetRun
+              - devicefarm:GetUpload
+              - devicefarm:CreateUpload
+              - devicefarm:ScheduleRun
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - servicecatalog:ListProvisioningArtifacts
+              - servicecatalog:CreateProvisioningArtifact
+              - servicecatalog:DescribeProvisioningArtifact
+              - servicecatalog:DeleteProvisioningArtifact
+              - servicecatalog:UpdateProduct
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - cloudformation:ValidateTemplate
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - ecr:DescribeImages
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - states:DescribeExecution
+              - states:DescribeStateMachine
+              - states:StartExecution
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - appconfig:StartDeployment
+              - appconfig:StopDeployment
+              - appconfig:GetDeployment
+              Resource: "*" 
 
-  IAMPolicyForCodePipeline:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Ref CodePipelinePolicyName
-      PolicyDocument:
-        Statement:
-        - Action:
-          - s3:GetObject
-          - s3:GetObjectVersion
-          - s3:GetBucketVersioning
-          Resource: "*"
-          Effect: Allow
-        - Action:
-          - s3:PutObject
-          Resource:
-          - arn:aws:s3:::codepipeline*
-          - arn:aws:s3:::elasticbeanstalk*
-          Effect: Allow
-        - Action:
-          - codecommit:CancelUploadArchive
-          - codecommit:GetBranch
-          - codecommit:GetCommit
-          - codecommit:GetUploadArchiveStatus
-          - codecommit:UploadArchive
-          Resource: "*"
-          Effect: Allow
-        - Action:
-          - codedeploy:CreateDeployment
-          - codedeploy:GetApplicationRevision
-          - codedeploy:GetDeployment
-          - codedeploy:GetDeploymentConfig
-          - codedeploy:RegisterApplicationRevision
-          Resource: "*"
-          Effect: Allow
-        - Action:
-          - elasticbeanstalk:*
-          - ec2:*
-          - elasticloadbalancing:*
-          - autoscaling:*
-          - cloudwatch:*
-          - s3:*
-          - sns:*
-          - cloudformation:*
-          - rds:*
-          - sqs:*
-          - ecs:*
-          - iam:PassRole
-          Resource: "*"
-          Effect: Allow
-        - Action:
-          - lambda:InvokeFunction
-          - lambda:ListFunctions
-          Resource: "*"
-          Effect: Allow
-        - Action:
-          - opsworks:CreateDeployment
-          - opsworks:DescribeApps
-          - opsworks:DescribeCommands
-          - opsworks:DescribeDeployments
-          - opsworks:DescribeInstances
-          - opsworks:DescribeStacks
-          - opsworks:UpdateApp
-          - opsworks:UpdateStack
-          Resource: "*"
-          Effect: Allow
-        - Action:
-          - cloudformation:CreateStack
-          - cloudformation:DeleteStack
-          - cloudformation:DescribeStacks
-          - cloudformation:UpdateStack
-          - cloudformation:CreateChangeSet
-          - cloudformation:DeleteChangeSet
-          - cloudformation:DescribeChangeSet
-          - cloudformation:ExecuteChangeSet
-          - cloudformation:SetStackPolicy
-          - cloudformation:ValidateTemplate
-          - iam:PassRole
-          Resource: "*"
-          Effect: Allow
-        - Action:
-          - codebuild:BatchGetBuilds
-          - codebuild:StartBuild
-          Resource: "*"
-          Effect: Allow
-        Version: '2012-10-17'
-      Roles:
-        - Ref: IAMRoleForCodePipeline
-      
   RDSCodePipeLine:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -241,8 +246,6 @@ Resources:
                 Version: '1'
               InputArtifacts:
                 - Name: SourceOutput
-              OutputArtifacts:
-                - Name: BuildOutput
               Configuration:
                 ProjectName: !Ref CodeBuildProject
               RunOrder: 1
@@ -294,7 +297,7 @@ Resources:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Join [ "-", [ !Ref 'ProjectName' , "flyway-codebuild", !Ref 'AWS::Region', "project" ] ]        
-      ServiceRole: !Ref CodeBuildRole
+      ServiceRole: !GetAtt IAMRoleForRDSPipelineCodeBuild.Arn
       Artifacts:
         Type: no_artifacts
       LogsConfig:
@@ -305,7 +308,7 @@ Resources:
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/docker:18.09.0-1.7.0
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
         PrivilegedMode: "true"
         EnvironmentVariables:
           - Name: username 
@@ -323,20 +326,15 @@ Resources:
           - LOCAL_DOCKER_LAYER_CACHE            
       Source:
         Type: GITHUB
-        Location: !Sub 'https://github.com/${ConfigurationOwner}/${Repo}.git'  
-        BuildSpec: |
-          version: 0.2
-          phases:
-            build:
-              commands:
-                - docker run --rm -v $(pwd)/sql:/flyway/sql -v $(pwd)/conf:/flyway/conf flyway/flyway -url=$url -user=$username -password=$password migrate        
+        Location: !Sub 'https://github.com/${ConfigurationOwner}/${Repo}.git'        
       TimeoutInMinutes: 30
       VpcConfig:
         VpcId: !Ref VpcId
         Subnets: 
             - !Ref PrivateSubnet1AId
             - !Ref PrivateSubnet1BId
-        SecurityGroupIds: [!Ref CodeBuildSecurityGroupId]
+        SecurityGroupIds: 
+          - !Ref CodeBuildSecurityGroupId
 
   IAMRoleForRDSPipelineCodeBuild:
     Type: "AWS::IAM::Role"
@@ -355,6 +353,7 @@ Resources:
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
         - "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+        - "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
   
   RDSPipeLineWebhook:
     Type: AWS::CodePipeline::Webhook
@@ -366,8 +365,8 @@ Resources:
         - JsonPath: $.ref
           MatchEquals: !Sub refs/heads/main
       TargetAction: Source 
-      TargetPipeline: !Ref RDSCodePipeline
-      TargetPipelineVersion: !GetAtt RDSCodePipeline.Version
+      TargetPipeline: !Ref RDSCodePipeLine
+      TargetPipelineVersion: !GetAtt RDSCodePipeLine.Version
       RegisterWithThirdParty: 'true' 
 
 Outputs:
@@ -380,3 +379,16 @@ Outputs:
 # aws cloudformation create-stack --stack-name pipelineStack --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback
 
 # aws cloudformation update-stack --stack-name pipelineStack --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback 
+
+# Host github.com-axitdhola
+#     HostName github.com
+#     User git
+#     IdentityFile ~/.ssh/axitdhola
+
+# Host github.com-Axit88
+#     HostName github.com
+#     User git
+#     IdentityFile ~/.ssh/Axit88
+
+# git config user.email "axit.dhola@mindtickle.com"
+# git config user.name "Axit88"
