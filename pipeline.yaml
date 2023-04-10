@@ -16,7 +16,7 @@ Parameters:
     Default: main
   OAuthToken:
     Type: String
-    Default: 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
+    Default: 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
   BucketName:
     Type: String
     Default: axitsamplepipelinebucket
@@ -54,14 +54,6 @@ Parameters:
   Password: 
     Type: String
     Default: admin123
-  VpcId: 
-    Type: String
-  PrivateSubnet1AId: 
-    Type: String
-  PrivateSubnet1BId:
-    Type: String
-  CodeBuildSecurityGroupId: 
-    Type: String
   JDBCUrl: 
     Type: String
     Default: jdbc:mysql://database-2.clgbfp6capnz.ap-northeast-1.rds.amazonaws.com:3306/rdsDb2
@@ -328,13 +320,6 @@ Resources:
         Type: GITHUB
         Location: !Sub 'https://github.com/${ConfigurationOwner}/${Repo}.git'        
       TimeoutInMinutes: 30
-      VpcConfig:
-        VpcId: !Ref VpcId
-        Subnets: 
-            - !Ref PrivateSubnet1AId
-            - !Ref PrivateSubnet1BId
-        SecurityGroupIds: 
-          - !Ref CodeBuildSecurityGroupId
 
   IAMRoleForRDSPipelineCodeBuild:
     Type: "AWS::IAM::Role"
