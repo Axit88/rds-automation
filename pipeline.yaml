@@ -1,0 +1,382 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodePipeline with Cloudformation 
+
+Parameters:
+  PipeLineName:
+    Type: String
+    Default: default-pipeline
+  ConfigurationOwner:
+    Type: String
+    Default: axitdhola
+  Repo:
+    Type: String
+    Default: rds-automation
+  Branch:
+    Type: String
+    Default: main
+  OAuthToken:
+    Type: String
+    Default: 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
+  BucketName:
+    Type: String
+    Default: axitsamplepipelinebucket
+  DeployStackName:
+    Type: String
+    Default: RDS-pipeline-stack
+  CodePipelineRoleName: 
+    Type: String
+    Default: RDS-nested-codepipeline-role
+  CodePipelinePolicyName: 
+    Type: String
+    Default: RDS-nested-codepipeline-policy
+  CodePipelineRoleForDeploy:
+    Type: String
+    Default: RDS-nested-codepipeline-deploy-role
+  BuildType: 
+    Type: String
+    Default: LINUX_CONTAINER
+  BuildImage:
+    Type: String
+    Default: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+  BuildComputeType: 
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+  IAMRoleForLambdaCodeBuildName:
+    Type: String
+    Default: RDS-nested-IAMRoleForRDSPipelineCodeBuild
+  ProjectName:
+    Type: String
+    Description: "What is the name of the project?"
+    Default: rdsAutomationBuildProject
+  DevAccountId:
+    Type: String
+    Default: "803928384365"
+  Username: 
+    Type: String
+    Default: admin
+  Password: 
+    Type: String
+    Default: admin123
+  VpcId: 
+    Type: String
+  PrivateSubnet1AId: 
+    Type: String
+  PrivateSubnet1BId:
+    Type: String
+  CodeBuildSecurityGroupId: 
+    Type: String
+
+Resources:
+  IAMRoleForCodePipeline:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: !Ref CodePipelineRoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codepipeline.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Tags:
+        - Key: env 
+          Value: integration 
+        - Key: application 
+          Value: codepipeline 
+  
+  IAMRoleForDeployCodepipeline:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: !Ref CodePipelineRoleForDeploy
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "cloudformation.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+      - PolicyName: codeDeployPolicyForRDSPipeline
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Action:
+            - organizations:*
+            - sso:*
+            - sns:*
+            - sso-directory:*
+            Resource: "*"
+            Effect: Allow
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+
+  IAMPolicyForCodePipeline:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Ref CodePipelinePolicyName
+      PolicyDocument:
+        Statement:
+        - Action:
+          - s3:GetObject
+          - s3:GetObjectVersion
+          - s3:GetBucketVersioning
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - s3:PutObject
+          Resource:
+          - arn:aws:s3:::codepipeline*
+          - arn:aws:s3:::elasticbeanstalk*
+          Effect: Allow
+        - Action:
+          - codecommit:CancelUploadArchive
+          - codecommit:GetBranch
+          - codecommit:GetCommit
+          - codecommit:GetUploadArchiveStatus
+          - codecommit:UploadArchive
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - codedeploy:CreateDeployment
+          - codedeploy:GetApplicationRevision
+          - codedeploy:GetDeployment
+          - codedeploy:GetDeploymentConfig
+          - codedeploy:RegisterApplicationRevision
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - elasticbeanstalk:*
+          - ec2:*
+          - elasticloadbalancing:*
+          - autoscaling:*
+          - cloudwatch:*
+          - s3:*
+          - sns:*
+          - cloudformation:*
+          - rds:*
+          - sqs:*
+          - ecs:*
+          - iam:PassRole
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - lambda:InvokeFunction
+          - lambda:ListFunctions
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - opsworks:CreateDeployment
+          - opsworks:DescribeApps
+          - opsworks:DescribeCommands
+          - opsworks:DescribeDeployments
+          - opsworks:DescribeInstances
+          - opsworks:DescribeStacks
+          - opsworks:UpdateApp
+          - opsworks:UpdateStack
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - cloudformation:CreateStack
+          - cloudformation:DeleteStack
+          - cloudformation:DescribeStacks
+          - cloudformation:UpdateStack
+          - cloudformation:CreateChangeSet
+          - cloudformation:DeleteChangeSet
+          - cloudformation:DescribeChangeSet
+          - cloudformation:ExecuteChangeSet
+          - cloudformation:SetStackPolicy
+          - cloudformation:ValidateTemplate
+          - iam:PassRole
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - codebuild:BatchGetBuilds
+          - codebuild:StartBuild
+          Resource: "*"
+          Effect: Allow
+        Version: '2012-10-17'
+      Roles:
+        - Ref: IAMRoleForCodePipeline
+      
+  RDSCodePipeLine:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref BucketName
+      Name: !Ref PipeLineName
+      RoleArn: !GetAtt IAMRoleForCodePipeline.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source 
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: "1"
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref ConfigurationOwner
+                Repo: !Ref Repo
+                Branch: !Ref Branch
+                OAuthToken: !Ref OAuthToken
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              RunOrder: 1
+
+        # - Name: Deploy
+        #   Actions:
+        #     - Name: Deploy
+        #       ActionTypeId:
+        #         Category: Deploy
+        #         Owner: AWS
+        #         Version: "1"
+        #         Provider: CloudFormation
+        #       Configuration:
+        #         ActionMode: CREATE_UPDATE
+        #         StackName: !Ref DeployStackName
+        #         Capabilities: CAPABILITY_NAMED_IAM
+        #         TemplatePath: BuildOutput::rootStack.yaml
+        #         RoleArn: !GetAtt IAMRoleForDeployCodepipeline.Arn
+        #       InputArtifacts:
+        #         - Name: BuildOutput
+        #       RunOrder: 2
+  
+  # BuildProject:
+  #   Type: AWS::CodeBuild::Project
+  #   Properties:
+  #     Name: RDSPipelineBuildProject
+  #     Source:
+  #       Type: GITHUB
+  #       Location: !Sub 'https://github.com/${ConfigurationOwner}/${Repo}.git'
+  #     Artifacts:
+  #       Type: S3 
+  #       Name: RDSBuildProjectArtifacts
+  #       Location: !Ref BucketName
+  #     # Triggers:
+  #     #   Webhook: true
+  #     Environment:
+  #       Type: !Ref BuildType
+  #       Image: !Ref BuildImage
+  #       ComputeType: !Ref BuildComputeType
+  #       ImagePullCredentialsType: CODEBUILD
+  #     ServiceRole: !GetAtt IAMRoleForRDSPipelineCodeBuild.Arn
+  #     TimeoutInMinutes: 60
+  #     QueuedTimeoutInMinutes: 480
+  #     LogsConfig:
+  #       CloudWatchLogs:
+  #         Status: ENABLED
+  
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Join [ "-", [ !Ref 'ProjectName' , "flyway-codebuild", !Ref 'AWS::Region', "project" ] ]        
+      ServiceRole: !Ref CodeBuildRole
+      Artifacts:
+        Type: no_artifacts
+      LogsConfig:
+        CloudWatchLogs:
+          Status: "ENABLED"
+          GroupName: !Ref ProjectName
+          StreamName: "flyway"
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/docker:18.09.0-1.7.0
+        PrivilegedMode: "true"
+        EnvironmentVariables:
+          - Name: username 
+            Value: !Ref Username
+            Type: PLAINTEXT
+          - Name: password 
+            Value: !Ref Password
+            Type: PLAINTEXT
+          - Name: url
+            Value: !Ref JDBCUrl
+            Type: PLAINTEXT
+      Cache:
+        Type: LOCAL
+        Modes: 
+          - LOCAL_DOCKER_LAYER_CACHE            
+      Source:
+        Type: GITHUB
+        Location: !Sub 'https://github.com/${ConfigurationOwner}/${Repo}.git'  
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - docker run --rm -v $(pwd)/sql:/flyway/sql -v $(pwd)/conf:/flyway/conf flyway/flyway -url=$url -user=$username -password=$password migrate        
+      TimeoutInMinutes: 30
+      VpcConfig:
+        VpcId: !Ref VpcId
+        Subnets: 
+            - !Ref PrivateSubnet1AId
+            - !Ref PrivateSubnet1BId
+        SecurityGroupIds: [!Ref CodeBuildSecurityGroupId]
+
+  IAMRoleForRDSPipelineCodeBuild:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: !Ref IAMRoleForLambdaCodeBuildName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        - "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+  
+  RDSPipeLineWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken: !Ref OAuthToken
+      Filters:
+        - JsonPath: $.ref
+          MatchEquals: !Sub refs/heads/main
+      TargetAction: Source 
+      TargetPipeline: !Ref RDSCodePipeline
+      TargetPipelineVersion: !GetAtt RDSCodePipeline.Version
+      RegisterWithThirdParty: 'true' 
+
+Outputs:
+  RDSCodePipeLine:
+    Description: RDSCodePipeLine Detail
+    Value: !Ref RDSCodePipeLine
+    Export:
+      Name: RDSCodePipeLine
+
+# aws cloudformation create-stack --stack-name pipelineStack --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback
+
+# aws cloudformation update-stack --stack-name pipelineStack --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback 
